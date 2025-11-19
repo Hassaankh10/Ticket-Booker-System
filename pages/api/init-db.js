@@ -2,7 +2,7 @@
 let initialized = false;
 
 async function handler(req, res) {
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ success: false, message: 'Method not allowed' });
   }
 
@@ -11,19 +11,25 @@ async function handler(req, res) {
   }
 
   try {
-    const { runMigrations } = require('../../src/db');
-    const seedDatabase = require('../../src/db/seed');
-    const { startExpirationWorker } = require('../../src/services/seatLock.service');
+    const { runMigrations } = require('src/db');
+    const seedDatabase = require('src/db/seed');
+    const { startExpirationWorker } = require('src/services/seatLock.service');
 
     runMigrations();
-    seedDatabase();
+    await seedDatabase();
     startExpirationWorker();
     
     initialized = true;
     return res.status(200).json({ success: true, message: 'Database initialized successfully' });
   } catch (error) {
     console.error('Database initialization error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to initialize database', error: error.message });
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to initialize database', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
 module.exports = handler;
+module.exports.default = handler;

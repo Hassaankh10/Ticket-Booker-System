@@ -5,7 +5,7 @@ import Script from 'next/script';
 export default function Home() {
   useEffect(() => {
     // Database initialization happens server-side via API route
-    fetch('/api/init-db').catch(() => {
+    fetch('/api/init-db', { method: 'POST' }).catch(() => {
       // Silently fail if already initialized
     });
 
