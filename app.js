@@ -501,6 +501,22 @@ class TicketBookerApp {
       .map((event) => this.createEventCard(event))
       .join('');
 
+    // Preload images and handle errors
+    container.querySelectorAll('.event-card__image').forEach((img) => {
+      const originalSrc = img.src;
+      img.addEventListener('error', function() {
+        if (this.src !== PLACEHOLDER_IMAGE) {
+          console.log('Image failed to load:', originalSrc, 'Using placeholder');
+          this.src = PLACEHOLDER_IMAGE;
+        }
+      });
+      img.addEventListener('load', function() {
+        this.style.opacity = '1';
+      });
+      img.style.opacity = '0';
+      img.style.transition = 'opacity 0.3s';
+    });
+
     container.querySelectorAll('.event-card').forEach((card) => {
       card.addEventListener('click', () => {
         const eventId = card.getAttribute('data-event-id');
@@ -510,9 +526,13 @@ class TicketBookerApp {
   }
 
   createEventCard(event) {
+    let imageUrl = PLACEHOLDER_IMAGE;
+    if (event.banner_url && typeof event.banner_url === 'string' && event.banner_url.trim() !== '') {
+      imageUrl = event.banner_url.trim();
+    }
     return `
       <div class="event-card" data-event-id="${event.event_id}">
-        <img src="${event.banner_url || PLACEHOLDER_IMAGE}" alt="${event.event_name}" class="event-card__image" />
+        <img src="${imageUrl}" alt="${event.event_name}" class="event-card__image" crossorigin="anonymous" loading="lazy" />
         <div class="event-card__content">
           <div class="event-card__header">
             <h3 class="event-card__title">${event.event_name}</h3>
@@ -538,10 +558,14 @@ class TicketBookerApp {
       this.analytics.trackEvent(eventId);
       this.selectedEvent = event;
       const container = document.getElementById('eventDetailsContent');
+      let imageUrl = PLACEHOLDER_IMAGE;
+      if (event.banner_url && typeof event.banner_url === 'string' && event.banner_url.trim() !== '') {
+        imageUrl = event.banner_url.trim();
+      }
       container.innerHTML = `
         <div class="event-details">
           <div class="event-details__header">
-            <img src="${event.banner_url || PLACEHOLDER_IMAGE}" alt="${event.event_name}" class="event-details__image" />
+            <img src="${imageUrl}" alt="${event.event_name}" class="event-details__image" crossorigin="anonymous" loading="lazy" />
             <h1 class="event-details__title">${event.event_name}</h1>
             <span class="event-card__type">${event.event_type}</span>
           </div>
