@@ -2,7 +2,13 @@ const path = require('path');
 
 require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
 
-if (!process.env.JWT_SECRET) {
+// Only check JWT_SECRET at runtime, not during build
+// Vercel builds don't have access to environment variables during build phase
+// Check NEXT_PHASE to detect build time vs runtime
+const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
+                    process.env.NEXT_PHASE === 'phase-production-compile';
+
+if (!isBuildTime && !process.env.JWT_SECRET) {
   throw new Error('Environment variable JWT_SECRET is required but missing');
 }
 
