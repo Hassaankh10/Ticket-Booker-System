@@ -64,6 +64,14 @@ class ApiClient {
     return this.request('/auth/register', { method: 'POST', body: payload });
   }
 
+  forgotPassword(payload) {
+    return this.request('/auth/forgot-password', { method: 'POST', body: payload });
+  }
+
+  resetPassword(payload) {
+    return this.request('/auth/reset-password', { method: 'POST', body: payload });
+  }
+
   getProfile() {
     return this.request('/auth/profile');
   }
@@ -81,7 +89,7 @@ class ApiClient {
   }
 
   createEvent(data) {
-    return this.request('/events/create', { method: 'POST', body: data });
+    return this.request('/events', { method: 'POST', body: data });
   }
 
   updateEvent(id, data) {
@@ -312,6 +320,80 @@ class TicketBookerApp {
         this.showToast(error.message, 'error');
       }
     });
+
+    // Forgot Password Link
+    const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+    forgotPasswordLink?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.hideModals();
+      this.showForgotPasswordModal();
+    });
+
+    // Forgot Password Form
+    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+    forgotPasswordForm?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('forgotPasswordEmail').value;
+      try {
+        const result = await this.api.forgotPassword({ email });
+        this.showToast(result.message, 'success');
+        
+        // In development, show the reset token if provided
+        if (result.resetToken && process.env.NODE_ENV === 'development') {
+          console.log('Reset Token (dev only):', result.resetToken);
+          console.log('Reset URL (dev only):', result.resetUrl);
+          this.showToast(`Reset token: ${result.resetToken} (check console)`, 'success');
+        }
+        
+        forgotPasswordForm.reset();
+        this.hideModals();
+      } catch (error) {
+        this.showToast(error.message, 'error');
+      }
+    });
+
+    // Reset Password Form
+    const resetPasswordForm = document.getElementById('resetPasswordForm');
+    resetPasswordForm?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const token = document.getElementById('resetPasswordToken').value;
+      const password = document.getElementById('resetPasswordNew').value;
+      const confirmPassword = document.getElementById('resetPasswordConfirm').value;
+
+      if (password !== confirmPassword) {
+        this.showToast('Passwords do not match', 'error');
+        return;
+      }
+
+      try {
+        const result = await this.api.resetPassword({ token, password });
+        this.showToast(result.message, 'success');
+        resetPasswordForm.reset();
+        this.hideModals();
+        this.showLoginModal();
+      } catch (error) {
+        this.showToast(error.message, 'error');
+      }
+    });
+
+    // Back to Login buttons
+    document.getElementById('backToLoginBtn')?.addEventListener('click', () => {
+      this.hideModals();
+      this.showLoginModal();
+    });
+
+    document.getElementById('backToLoginFromResetBtn')?.addEventListener('click', () => {
+      this.hideModals();
+      this.showLoginModal();
+    });
+
+    // Check for reset token in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const resetToken = urlParams.get('token');
+    if (resetToken) {
+      document.getElementById('resetPasswordToken').value = resetToken;
+      this.showResetPasswordModal();
+    }
   }
 
   bindModalControls() {
@@ -1137,6 +1219,14 @@ class TicketBookerApp {
     document.getElementById('registerModal')?.classList.remove('hidden');
   }
 
+  showForgotPasswordModal() {
+    document.getElementById('forgotPasswordModal')?.classList.remove('hidden');
+  }
+
+  showResetPasswordModal() {
+    document.getElementById('resetPasswordModal')?.classList.remove('hidden');
+  }
+
   hideModals() {
     document.querySelectorAll('.modal').forEach((modal) => modal.classList.add('hidden'));
     this.currentEditingEventId = null;
@@ -1170,6 +1260,32 @@ function navigateToPage(page) {
   window.app?.navigateToPage(page);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  window.app = new TicketBookerApp();
-});
+// Make TicketBookerApp available globally immediately
+if (typeof window !== 'undefined') {
+  window.TicketBookerApp = TicketBookerApp;
+}
+
+// Initialize app when DOM is ready or immediately if already loaded
+function initializeApp() {
+  if (!window.app && typeof TicketBookerApp !== 'undefined') {
+    try {
+      window.app = new TicketBookerApp();
+      console.log('TicketBookerApp initialized successfully');
+    } catch (error) {
+      console.error('Error initializing TicketBookerApp:', error);
+    }
+  }
+}
+
+// Initialize on DOMContentLoaded or immediately if DOM is already loaded
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+  } else {
+    // DOM is already loaded
+    setTimeout(initializeApp, 100);
+  }
+} else if (typeof window !== 'undefined') {
+  // Fallback for environments without document
+  setTimeout(initializeApp, 100);
+}

@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
   phone TEXT,
   role_id INTEGER NOT NULL,
   status TEXT DEFAULT 'active',
+  password_reset_token TEXT,
+  password_reset_expires DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   deleted_at DATETIME,

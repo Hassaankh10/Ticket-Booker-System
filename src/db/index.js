@@ -44,6 +44,16 @@ const runMigrations = () => {
     // In a real system, we would check a migrations table.
     // For this refactor, we just run the initial schema.
     db.exec(up);
+    
+    // Add password reset fields if they don't exist (for existing databases)
+    try {
+      const { addPasswordResetFields } = require('./migrations/002_add_password_reset');
+      addPasswordResetFields(db);
+    } catch (error) {
+      // Migration might not be needed or already applied
+      logger.debug('Password reset fields migration:', error.message);
+    }
+    
     logger.info('Migrations executed successfully');
   } catch (error) {
     logger.error('Failed to run migrations', error);

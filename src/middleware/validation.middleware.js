@@ -15,7 +15,7 @@ const validate =
       // In Express 5, req.query is read-only, so we can't reassign it
       // For query params, validation is read-only (just validates, doesn't modify)
       if (property !== 'query') {
-        req[property] = value;
+      req[property] = value;
       }
       next();
     } catch (err) {
