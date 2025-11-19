@@ -9,18 +9,24 @@ const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' ||
                     process.env.NEXT_PHASE === 'phase-production-compile';
 
 // Provide a fallback for JWT_SECRET during build, but validate at runtime when actually used
-const jwtSecret = process.env.JWT_SECRET || (isBuildTime ? 'build-time-placeholder' : null);
+let jwtSecret = process.env.JWT_SECRET;
 
-if (!isBuildTime && !jwtSecret) {
-  // Only warn, don't throw - let it fail when JWT is actually used
-  console.warn('Warning: JWT_SECRET environment variable is not set. JWT operations will fail.');
+if (isBuildTime) {
+  // During build, use placeholder
+  jwtSecret = 'build-time-placeholder';
+} else if (!jwtSecret) {
+  // At runtime, if not set, use a fallback but warn
+  // This allows the app to start but JWT operations will fail with a clear error
+  jwtSecret = 'fallback-secret-please-set-jwt-secret';
+  console.warn('⚠️  WARNING: JWT_SECRET environment variable is not set. JWT operations will fail.');
+  console.warn('⚠️  Please set JWT_SECRET in your environment variables.');
 }
 
 const config = {
   env: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 4000),
   jwt: {
-    secret: jwtSecret || 'fallback-secret-change-in-production',
+    secret: jwtSecret,
     expiresIn: process.env.JWT_EXPIRES_IN || '12h',
   },
   db: {

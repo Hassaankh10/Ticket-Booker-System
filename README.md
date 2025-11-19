@@ -189,8 +189,8 @@ The database file (`ticket_booking_system.db`) will be created in the project ro
 ## Default Admin Credentials
 
 After first run, you can log in with:
-- **Email**: `admin@ticketbooker.com`
-- **Password**: `admin123`
+- **Email**: `admin@ticketbook.com`
+- **Password**: `Admin@123`
 
 **Note**: Change the default password after first login for security.
 
