@@ -1,8 +1,8 @@
-const { errorResponse } = require('../../../src/utils/response');
-const { authenticate } = require('../../../src/lib/api-helpers');
-const logger = require('../../../src/utils/logger');
-const seatLockService = require('../../../src/services/seatLock.service');
-const { ForbiddenError } = require('../../../src/utils/errors');
+const { errorResponse } = require('src/utils/response');
+const { authenticate } = require('src/lib/api-helpers');
+const logger = require('src/utils/logger');
+const seatLockService = require('src/services/seatLock.service');
+const { ForbiddenError } = require('src/utils/errors');
 
 async function handler(req, res) {
   if (req.method !== 'DELETE') {

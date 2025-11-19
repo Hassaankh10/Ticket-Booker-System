@@ -1,8 +1,8 @@
-const { errorResponse } = require('../../../src/utils/response');
-const { authenticate, validateRequest } = require('../../../src/lib/api-helpers');
-const logger = require('../../../src/utils/logger');
-const seatLockService = require('../../../src/services/seatLock.service');
-const { seatLockSchema } = require('../../../src/validators/booking.validator');
+const { errorResponse } = require('src/utils/response');
+const { authenticate, validateRequest } = require('src/lib/api-helpers');
+const logger = require('src/utils/logger');
+const seatLockService = require('src/services/seatLock.service');
+const { seatLockSchema } = require('src/validators/booking.validator');
 
 async function handler(req, res) {
   if (req.method !== 'POST') {

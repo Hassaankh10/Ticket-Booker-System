@@ -1,8 +1,8 @@
-const { errorResponse } = require('../../../src/utils/response');
-const { authenticate, requireAdmin, validateRequest } = require('../../../src/lib/api-helpers');
-const logger = require('../../../src/utils/logger');
-const adminService = require('../../../src/services/admin.service');
-const { createUserSchema } = require('../../../src/validators/admin.validator');
+const { errorResponse } = require('src/utils/response');
+const { authenticate, requireAdmin, validateRequest } = require('src/lib/api-helpers');
+const logger = require('src/utils/logger');
+const adminService = require('src/services/admin.service');
+const { createUserSchema } = require('src/validators/admin.validator');
 
 async function handler(req, res) {
   if (req.method !== 'POST') {

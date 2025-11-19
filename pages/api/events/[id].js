@@ -1,8 +1,8 @@
-const { errorResponse } = require('../../../src/utils/response');
-const { authenticate, requireAdmin, validateRequest } = require('../../../src/lib/api-helpers');
-const logger = require('../../../src/utils/logger');
-const eventService = require('../../../src/services/event.service');
-const { updateEventSchema } = require('../../../src/validators/event.validator');
+const { errorResponse } = require('src/utils/response');
+const { authenticate, requireAdmin, validateRequest } = require('src/lib/api-helpers');
+const logger = require('src/utils/logger');
+const eventService = require('src/services/event.service');
+const { updateEventSchema } = require('src/validators/event.validator');
 
 async function handler(req, res) {
   const { id } = req.query;

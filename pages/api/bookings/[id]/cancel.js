@@ -1,7 +1,7 @@
-const { errorResponse } = require('../../../src/utils/response');
-const { authenticate } = require('../../../src/lib/api-helpers');
-const logger = require('../../../src/utils/logger');
-const bookingService = require('../../../src/services/booking.service');
+const { errorResponse } = require('src/utils/response');
+const { authenticate } = require('src/lib/api-helpers');
+const logger = require('src/utils/logger');
+const bookingService = require('src/services/booking.service');
 
 async function handler(req, res) {
   if (req.method !== 'PATCH') {

@@ -1,8 +1,8 @@
-const { errorResponse } = require('../../../src/utils/response');
-const { authenticate, requireAdmin, validateRequest } = require('../../../src/lib/api-helpers');
-const logger = require('../../../src/utils/logger');
-const feedbackService = require('../../../src/services/feedback.service');
-const { createFeedbackSchema } = require('../../../src/validators/feedback.validator');
+const { errorResponse } = require('src/utils/response');
+const { authenticate, requireAdmin, validateRequest } = require('src/lib/api-helpers');
+const logger = require('src/utils/logger');
+const feedbackService = require('src/services/feedback.service');
+const { createFeedbackSchema } = require('src/validators/feedback.validator');
 
 async function handler(req, res) {
   try {

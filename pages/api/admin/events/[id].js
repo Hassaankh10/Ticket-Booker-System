@@ -1,7 +1,7 @@
-const { errorResponse } = require('../../../../src/utils/response');
-const { authenticate, requireAdmin } = require('../../../../src/lib/api-helpers');
-const logger = require('../../../../src/utils/logger');
-const adminService = require('../../../../src/services/admin.service');
+const { errorResponse } = require('src/utils/response');
+const { authenticate, requireAdmin } = require('src/lib/api-helpers');
+const logger = require('src/utils/logger');
+const adminService = require('src/services/admin.service');
 
 async function handler(req, res) {
   if (req.method !== 'DELETE') {

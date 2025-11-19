@@ -1,6 +1,6 @@
-const { errorResponse } = require('../../../src/utils/response');
-const logger = require('../../../src/utils/logger');
-const eventService = require('../../../src/services/event.service');
+const { errorResponse } = require('src/utils/response');
+const logger = require('src/utils/logger');
+const eventService = require('src/services/event.service');
 
 async function handler(req, res) {
   if (req.method !== 'GET') {
