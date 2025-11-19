@@ -5,7 +5,8 @@ const nextConfig = {
   // Allow CommonJS in API routes
   webpack: (config, { isServer }) => {
     if (isServer) {
-      config.externals = [...(config.externals || []), 'better-sqlite3'];
+      // Don't externalize better-sqlite3 for Vercel deployment
+      // Vercel will handle native module compilation
     }
     return config;
   },
@@ -19,6 +20,8 @@ const nextConfig = {
       },
     ],
   },
+  // Output configuration for Vercel
+  output: 'standalone',
 };
 
 module.exports = nextConfig;
