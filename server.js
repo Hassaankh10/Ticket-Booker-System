@@ -188,6 +188,57 @@ app.get('/api/events/:id', (req, res) => {
   return res.json(event);
 });
 
+// Helper function to refund all bookings for an event
+const refundEventBookings = (eventId) => {
+  // Get all confirmed bookings for this event
+  const bookings = db
+    .prepare(
+      `SELECT booking_id, user_id, total_amount, num_tickets 
+       FROM bookings 
+       WHERE event_id = ? AND booking_status = 'confirmed'`
+    )
+    .all(eventId);
+
+  // Process refunds in a transaction
+  const refundTransaction = db.transaction((bookingList) => {
+    const updateBooking = db.prepare(
+      `UPDATE bookings 
+       SET booking_status = 'cancelled', payment_status = 'refunded' 
+       WHERE booking_id = ?`
+    );
+
+    const insertRefund = db.prepare(
+      `INSERT INTO payment_transactions (
+        booking_id, amount, payment_method, status, transaction_ref, metadata
+      ) VALUES (?, ?, ?, ?, ?, ?)`
+    );
+
+    bookingList.forEach((booking) => {
+      // Update booking status
+      updateBooking.run(booking.booking_id);
+
+      // Create refund transaction record
+      const refundRef = `REFUND-${booking.booking_id}-${Date.now()}`;
+      const metadata = JSON.stringify({
+        reason: 'Event cancelled or inactivated by admin',
+        refunded_at: new Date().toISOString(),
+      });
+
+      insertRefund.run(
+        booking.booking_id,
+        booking.total_amount,
+        'refund',
+        'refunded',
+        refundRef,
+        metadata
+      );
+    });
+  });
+
+  refundTransaction(bookings);
+  return bookings.length;
+};
+
 app.post('/api/events', authenticate, requireAdmin, (req, res) => {
   const {
     event_name,
@@ -256,6 +307,16 @@ app.put('/api/events/:id', authenticate, requireAdmin, (req, res) => {
     return res.status(404).json({ message: 'Event not found' });
   }
 
+  const newStatus = req.body.status ?? existing.status;
+  const wasActive = existing.status === 'active';
+  const isBecomingInactive = wasActive && newStatus === 'inactive';
+
+  // If event is being inactivated, refund all bookings
+  let refundedCount = 0;
+  if (isBecomingInactive) {
+    refundedCount = refundEventBookings(eventId);
+  }
+
   const payload = {
     event_name: req.body.event_name ?? existing.event_name,
     event_type: req.body.event_type ?? existing.event_type,
@@ -269,7 +330,7 @@ app.put('/api/events/:id', authenticate, requireAdmin, (req, res) => {
         : req.body.available_seats ?? existing.available_seats,
     price_per_ticket: req.body.price_per_ticket ?? existing.price_per_ticket,
     description: req.body.description ?? existing.description,
-    status: req.body.status ?? existing.status,
+    status: newStatus,
     banner_url: req.body.banner_url ?? existing.banner_url,
   };
 
@@ -290,25 +351,37 @@ app.put('/api/events/:id', authenticate, requireAdmin, (req, res) => {
   ).run({ ...payload, event_id: eventId });
 
   const updated = db.prepare('SELECT * FROM events WHERE event_id = ?').get(eventId);
-  return res.json(updated);
+  
+  const response = { ...updated };
+  if (refundedCount > 0) {
+    response.refundedBookings = refundedCount;
+    response.message = `Event inactivated. ${refundedCount} booking(s) refunded.`;
+  }
+  
+  return res.json(response);
 });
 
 app.delete('/api/events/:id', authenticate, requireAdmin, (req, res) => {
   const eventId = req.params.id;
-  const bookingCount = db
-    .prepare('SELECT COUNT(1) as total FROM bookings WHERE event_id = ?')
-    .get(eventId).total;
+  const event = db.prepare('SELECT * FROM events WHERE event_id = ?').get(eventId);
 
-  if (bookingCount > 0) {
-    return res.status(400).json({ message: 'Cannot delete event with existing bookings' });
+  if (!event) {
+    return res.status(404).json({ message: 'Event not found' });
   }
 
+  // Refund all bookings for this event
+  const refundedCount = refundEventBookings(eventId);
+
+  // Delete the event
   const info = db.prepare('DELETE FROM events WHERE event_id = ?').run(eventId);
   if (info.changes === 0) {
     return res.status(404).json({ message: 'Event not found' });
   }
 
-  return res.status(204).send();
+  return res.status(200).json({
+    message: `Event deleted successfully. ${refundedCount} booking(s) refunded.`,
+    refundedBookings: refundedCount,
+  });
 });
 
 // ---------- Booking Routes ----------
@@ -361,41 +434,56 @@ app.post('/api/bookings', authenticate, (req, res) => {
 
   const totalAmount = event.price_per_ticket * num_tickets;
   const seats = JSON.stringify(generateSeatNumbers(num_tickets));
+  
+  // Get current timestamp in local time (YYYY-MM-DD HH:MM:SS)
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const bookingDate = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 
   const insert = db.prepare(
     `INSERT INTO bookings (
-      user_id, event_id, num_tickets, total_amount, seat_numbers
-    ) VALUES (@user_id, @event_id, @num_tickets, @total_amount, @seat_numbers)`
+      user_id, event_id, num_tickets, total_amount, seat_numbers, booking_date
+    ) VALUES (@user_id, @event_id, @num_tickets, @total_amount, @seat_numbers, @booking_date)`
   );
 
-  const result = db.transaction(() => {
+  try {
     const booking = insert.run({
       user_id: req.user.user_id,
       event_id,
       num_tickets,
       total_amount: totalAmount,
       seat_numbers: seats,
+      booking_date: bookingDate,
     });
 
-    db.prepare(
-      `UPDATE events
-       SET available_seats = available_seats - ?
-       WHERE event_id = ?`
-    ).run(num_tickets, event_id);
+    const createdBooking = db
+      .prepare(
+        `SELECT b.*, e.event_name, e.banner_url, e.event_date
+         FROM bookings b
+         JOIN events e ON e.event_id = b.event_id
+         WHERE b.booking_id = ?`
+      )
+      .get(booking.lastInsertRowid);
 
-    return booking.lastInsertRowid;
-  })();
-
-  const createdBooking = db
-    .prepare(
-      `SELECT b.*, e.event_name, e.banner_url, e.event_date
-       FROM bookings b
-       JOIN events e ON e.event_id = b.event_id
-       WHERE b.booking_id = ?`
-    )
-    .get(result);
-
-  return res.status(201).json(createdBooking);
+    return res.status(201).json(createdBooking);
+  } catch (error) {
+    const message = error.message || '';
+    if (message.includes('Not enough seats available')) {
+      return res.status(400).json({ message: 'Not enough seats available' });
+    }
+    if (message.includes('Event not available')) {
+      return res.status(404).json({ message: 'Event not available' });
+    }
+    if (message.includes('Ticket quantity must be positive')) {
+      return res.status(400).json({ message: 'Ticket quantity must be positive' });
+    }
+    return res.status(500).json({ message: 'Unable to create booking' });
+  }
 });
 
 app.patch('/api/bookings/:id/cancel', authenticate, (req, res) => {
@@ -414,19 +502,11 @@ app.patch('/api/bookings/:id/cancel', authenticate, (req, res) => {
     return res.status(400).json({ message: 'Booking already cancelled' });
   }
 
-  db.transaction(() => {
-    db.prepare(
-      `UPDATE bookings
-       SET booking_status = 'cancelled'
-       WHERE booking_id = ?`
-    ).run(bookingId);
-
-    db.prepare(
-      `UPDATE events
-       SET available_seats = available_seats + ?
-       WHERE event_id = ?`
-    ).run(booking.num_tickets, booking.event_id);
-  })();
+  db.prepare(
+    `UPDATE bookings
+     SET booking_status = 'cancelled'
+     WHERE booking_id = ?`
+  ).run(bookingId);
 
   return res.json({ message: 'Booking cancelled successfully' });
 });

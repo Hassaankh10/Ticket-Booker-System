@@ -36,7 +36,8 @@ Visit `http://localhost:4000`.
 ## Database
 
 - SQLite file: `ticket_booking_system.db`
-- Key tables: `roles`, `users`, `events`, `bookings`, `feedback`
+- Key tables: `roles`, `users`, `events`, `bookings`, `feedback`, plus supporting tables for `payment_transactions`, `notifications`, `booking_status_log`, and `feedback_summary`
+- Automatic triggers maintain seat counts, enforce booking constraints, log status changes, sync payment state, and keep event feedback aggregates in sync
 - Seed data + migrations run automatically via `src/db.js`
 
 ## Project Scripts

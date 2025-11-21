@@ -72,6 +72,160 @@ CREATE TABLE IF NOT EXISTS feedback (
   FOREIGN KEY (user_id) REFERENCES users(user_id),
   FOREIGN KEY (event_id) REFERENCES events(event_id)
 );
+
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  payment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  booking_id INTEGER NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  payment_method VARCHAR(30) NOT NULL,
+  status VARCHAR(20) DEFAULT 'completed',
+  transaction_ref VARCHAR(120),
+  processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  metadata TEXT,
+  FOREIGN KEY (booking_id) REFERENCES bookings(booking_id)
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  notification_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  type VARCHAR(30) NOT NULL,
+  message TEXT NOT NULL,
+  is_read INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  read_at TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE IF NOT EXISTS booking_status_log (
+  log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  booking_id INTEGER NOT NULL,
+  previous_status VARCHAR(20),
+  new_status VARCHAR(20) NOT NULL,
+  changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  changed_by_user_id INTEGER,
+  FOREIGN KEY (booking_id) REFERENCES bookings(booking_id),
+  FOREIGN KEY (changed_by_user_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE IF NOT EXISTS feedback_summary (
+  event_id INTEGER PRIMARY KEY,
+  total_feedback INTEGER DEFAULT 0,
+  avg_rating REAL DEFAULT 0,
+  last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (event_id) REFERENCES events(event_id)
+);
+
+DROP TRIGGER IF EXISTS trg_bookings_validate_inventory;
+CREATE TRIGGER trg_bookings_validate_inventory
+BEFORE INSERT ON bookings
+FOR EACH ROW
+BEGIN
+  SELECT CASE
+    WHEN NEW.num_tickets <= 0 THEN
+      RAISE(ABORT, 'Ticket quantity must be positive')
+    WHEN NOT EXISTS (
+      SELECT 1 FROM events
+      WHERE event_id = NEW.event_id AND status = 'active'
+    ) THEN
+      RAISE(ABORT, 'Event not available')
+    WHEN (
+      SELECT available_seats FROM events WHERE event_id = NEW.event_id
+    ) < NEW.num_tickets THEN
+      RAISE(ABORT, 'Not enough seats available')
+  END;
+END;
+
+DROP TRIGGER IF EXISTS trg_bookings_decrement_seats;
+CREATE TRIGGER trg_bookings_decrement_seats
+AFTER INSERT ON bookings
+FOR EACH ROW
+WHEN NEW.booking_status = 'confirmed'
+BEGIN
+  UPDATE events
+  SET available_seats = available_seats - NEW.num_tickets
+  WHERE event_id = NEW.event_id;
+END;
+
+DROP TRIGGER IF EXISTS trg_bookings_restore_seats;
+CREATE TRIGGER trg_bookings_restore_seats
+AFTER UPDATE OF booking_status ON bookings
+FOR EACH ROW
+WHEN OLD.booking_status != 'cancelled' AND NEW.booking_status = 'cancelled'
+BEGIN
+  UPDATE events
+  SET available_seats = available_seats + OLD.num_tickets
+  WHERE event_id = OLD.event_id;
+END;
+
+DROP TRIGGER IF EXISTS trg_booking_status_audit;
+CREATE TRIGGER trg_booking_status_audit
+AFTER UPDATE OF booking_status ON bookings
+FOR EACH ROW
+WHEN OLD.booking_status != NEW.booking_status
+BEGIN
+  INSERT INTO booking_status_log (
+    booking_id,
+    previous_status,
+    new_status,
+    changed_by_user_id
+  ) VALUES (
+    NEW.booking_id,
+    OLD.booking_status,
+    NEW.booking_status,
+    NEW.user_id
+  );
+END;
+
+DROP TRIGGER IF EXISTS trg_payments_update_booking;
+CREATE TRIGGER trg_payments_update_booking
+AFTER INSERT ON payment_transactions
+FOR EACH ROW
+BEGIN
+  UPDATE bookings
+  SET payment_status = NEW.status,
+      booking_status = CASE
+        WHEN NEW.status = 'completed' THEN 'confirmed'
+        WHEN NEW.status = 'refunded' THEN 'cancelled'
+        ELSE booking_status
+      END
+  WHERE booking_id = NEW.booking_id;
+END;
+
+DROP TRIGGER IF EXISTS trg_feedback_summary_insert;
+CREATE TRIGGER trg_feedback_summary_insert
+AFTER INSERT ON feedback
+FOR EACH ROW
+WHEN NEW.rating IS NOT NULL AND NEW.event_id IS NOT NULL
+BEGIN
+  INSERT INTO feedback_summary (event_id, total_feedback, avg_rating, last_updated)
+  VALUES (NEW.event_id, 1, NEW.rating, CURRENT_TIMESTAMP)
+  ON CONFLICT(event_id) DO UPDATE SET
+    total_feedback = total_feedback + 1,
+    avg_rating = ROUND(
+      ((avg_rating * (total_feedback)) + NEW.rating) / (total_feedback + 1),
+      2
+    ),
+    last_updated = CURRENT_TIMESTAMP;
+END;
+
+DROP TRIGGER IF EXISTS trg_feedback_summary_update;
+CREATE TRIGGER trg_feedback_summary_update
+AFTER UPDATE OF rating ON feedback
+FOR EACH ROW
+WHEN NEW.rating IS NOT NULL AND NEW.event_id IS NOT NULL
+BEGIN
+  INSERT INTO feedback_summary (event_id, total_feedback, avg_rating, last_updated)
+  VALUES (
+    NEW.event_id,
+    (SELECT COUNT(1) FROM feedback WHERE event_id = NEW.event_id AND rating IS NOT NULL),
+    (SELECT ROUND(IFNULL(AVG(rating), 0), 2) FROM feedback WHERE event_id = NEW.event_id),
+    CURRENT_TIMESTAMP
+  )
+  ON CONFLICT(event_id) DO UPDATE SET
+    total_feedback = excluded.total_feedback,
+    avg_rating = excluded.avg_rating,
+    last_updated = CURRENT_TIMESTAMP;
+END;
 `;
 
 const ensureRoles = () => {
