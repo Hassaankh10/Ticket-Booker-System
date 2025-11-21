@@ -1,0 +1,11 @@
+.env
+node_modules/
+.DS_Store
+ticket_booking_system.db
+ticket_booking_system.db-shm
+ticket_booking_system.db-wal
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
