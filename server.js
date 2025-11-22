@@ -502,13 +502,40 @@ app.patch('/api/bookings/:id/cancel', authenticate, (req, res) => {
     return res.status(400).json({ message: 'Booking already cancelled' });
   }
 
-  db.prepare(
-    `UPDATE bookings
-     SET booking_status = 'cancelled'
-     WHERE booking_id = ?`
-  ).run(bookingId);
+  // Process cancellation and refund in a transaction
+  const cancelTransaction = db.transaction(() => {
+    // Update booking status and payment status
+    db.prepare(
+      `UPDATE bookings
+       SET booking_status = 'cancelled', payment_status = 'refunded'
+       WHERE booking_id = ?`
+    ).run(bookingId);
 
-  return res.json({ message: 'Booking cancelled successfully' });
+    // Create refund transaction record
+    const refundRef = `REFUND-${bookingId}-${Date.now()}`;
+    const metadata = JSON.stringify({
+      reason: 'Cancelled by user',
+      refunded_at: new Date().toISOString(),
+      cancelled_by: req.user.user_id,
+    });
+
+    db.prepare(
+      `INSERT INTO payment_transactions (
+        booking_id, amount, payment_method, status, transaction_ref, metadata
+      ) VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(
+      bookingId,
+      booking.total_amount,
+      'refund',
+      'refunded',
+      refundRef,
+      metadata
+    );
+  });
+
+  cancelTransaction();
+
+  return res.json({ message: 'Booking cancelled and refunded successfully' });
 });
 
 // ---------- Feedback Routes ----------

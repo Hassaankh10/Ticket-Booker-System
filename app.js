@@ -692,12 +692,16 @@ class TicketBookerApp {
 
   createBookingCard(booking) {
     const canCancel = booking.booking_status === 'confirmed';
+    // Show 'refunded' if payment_status is 'refunded', otherwise show booking_status
+    const displayStatus = booking.payment_status === 'refunded' ? 'refunded' : booking.booking_status;
+    const statusClass = canCancel ? 'success' : 'warning';
+    
     return `
       <div class="booking-card">
         <div class="booking-card__header">
           <div>
             <h4 class="booking-card__title">${booking.event_name}</h4>
-            <span class="status status--${canCancel ? 'success' : 'warning'}">${booking.booking_status}</span>
+            <span class="status status--${statusClass}">${displayStatus}</span>
           </div>
           <div>
             <strong>Booked on:</strong>
@@ -918,21 +922,26 @@ class TicketBookerApp {
           <tbody>
             ${bookings
               .map(
-                (booking) => `
+                (booking) => {
+                  // Show 'refunded' if payment_status is 'refunded', otherwise show booking_status
+                  const displayStatus = booking.payment_status === 'refunded' ? 'refunded' : booking.booking_status;
+                  const canCancel = booking.booking_status === 'confirmed';
+                  return `
                 <tr>
                   <td>#${booking.booking_id}</td>
                   <td>${booking.user_name}</td>
                   <td>${booking.event_name}</td>
                   <td>${booking.num_tickets}</td>
                   <td>PKR ${Number(booking.total_amount).toLocaleString()}</td>
-                  <td><span class="status status--${booking.booking_status === 'confirmed' ? 'success' : 'warning'}">${booking.booking_status}</span></td>
+                  <td><span class="status status--${canCancel ? 'success' : 'warning'}">${displayStatus}</span></td>
                   <td>${
-                    booking.booking_status === 'confirmed'
+                    canCancel
                       ? `<button class="btn btn--outline btn--sm btn--danger" onclick="window.app.cancelBooking(${booking.booking_id})">Cancel</button>`
                       : ''
                   }</td>
                 </tr>
-              `
+              `;
+                }
               )
               .join('')}
           </tbody>
