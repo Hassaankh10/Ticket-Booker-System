@@ -233,8 +233,25 @@ class TicketBookerApp {
     await this.state.restoreSession();
     await this.refreshEvents();
     this.setupEventListeners();
-    await this.loadHomePage();
+    this.setupBrowserNavigation();
+    
+    // Check URL hash on initial load
+    const initialPage = this.getPageFromHash() || 'home';
+    await this.navigateToPage(initialPage, false);
     this.updateUI();
+  }
+
+  setupBrowserNavigation() {
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', (event) => {
+      const page = event.state?.page || this.getPageFromHash() || 'home';
+      this.navigateToPage(page, false);
+    });
+  }
+
+  getPageFromHash() {
+    const hash = window.location.hash.slice(1); // Remove the '#'
+    return hash || null;
   }
 
   setupEventListeners() {
@@ -386,7 +403,7 @@ class TicketBookerApp {
     }
   }
 
-  async navigateToPage(page) {
+  async navigateToPage(page, updateHistory = true) {
     if (!page) return;
     try {
       if (page === 'dashboard' && !this.state.isLoggedIn()) {
@@ -395,7 +412,7 @@ class TicketBookerApp {
       }
       if (page === 'admin' && !this.state.isAdmin()) {
         this.showToast('Admin access required.', 'error');
-        this.navigateToPage('home');
+        this.navigateToPage('home', updateHistory);
         return;
       }
 
@@ -404,6 +421,13 @@ class TicketBookerApp {
       target?.classList.add('active');
       this.currentPage = page;
       this.analytics.trackPage(page);
+      
+      // Update browser history and URL hash
+      if (updateHistory) {
+        const url = `#${page}`;
+        window.history.pushState({ page }, '', url);
+      }
+      
       this.updateUI();
 
       switch (page) {
