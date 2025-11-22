@@ -29,3 +29,7 @@ Thumbs.db
 
 # Backups
 backups/
+
+# Deployment guides (keep local only)
+EC2-DEPLOYMENT-GUIDE.md
+QUICK-EC2-SETUP.md
