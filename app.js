@@ -260,6 +260,8 @@ class TicketBookerApp {
         e.preventDefault();
         const page = link.getAttribute('data-page');
         this.navigateToPage(page);
+        // Close mobile menu when a link is clicked
+        this.closeMobileMenu();
       });
     });
 
@@ -268,6 +270,7 @@ class TicketBookerApp {
     this.bindEventForms();
     this.bindFeedbackForm();
     this.bindAdminUserForm();
+    this.bindHamburgerMenu();
 
     const browseEventsBtn = document.querySelector('.hero .btn');
     if (browseEventsBtn) {
@@ -275,6 +278,43 @@ class TicketBookerApp {
         e.preventDefault();
         this.navigateToPage('events');
       });
+    }
+  }
+
+  bindHamburgerMenu() {
+    const hamburger = document.getElementById('hamburgerBtn');
+    const nav = document.getElementById('headerNav');
+
+    if (hamburger && nav) {
+      hamburger.addEventListener('click', () => {
+        hamburger.classList.toggle('active');
+        nav.classList.toggle('active');
+      });
+
+      // Close menu when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!hamburger.contains(e.target) && !nav.contains(e.target)) {
+          hamburger.classList.remove('active');
+          nav.classList.remove('active');
+        }
+      });
+
+      // Close menu on escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          hamburger.classList.remove('active');
+          nav.classList.remove('active');
+        }
+      });
+    }
+  }
+
+  closeMobileMenu() {
+    const hamburger = document.getElementById('hamburgerBtn');
+    const nav = document.getElementById('headerNav');
+    if (hamburger && nav) {
+      hamburger.classList.remove('active');
+      nav.classList.remove('active');
     }
   }
 
